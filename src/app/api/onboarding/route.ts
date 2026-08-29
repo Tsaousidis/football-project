@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 
-import { supabase } from "@/lib/supabase";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { validateTeamSelection } from "@/lib/teams";
 
 export async function POST(request: Request) {
@@ -22,22 +22,33 @@ export async function POST(request: Request) {
       );
     }
 
-    const isSupabaseConfigured = Boolean(
-      process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY,
+    const supabase = await createSupabaseServerClient();
+    const {
+      data: { user },
+      error: userError,
+    } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      return NextResponse.json(
+        { error: "You need to sign in before saving your team shortlist." },
+        { status: 401 },
+      );
+    }
+
+    const { error } = await supabase.from("user_teams").upsert(
+      selected.map((teamId) => ({
+        user_id: user.id,
+        team_id: teamId,
+      })),
+      { onConflict: "user_id,team_id" },
     );
 
-    if (isSupabaseConfigured) {
-      const { error } = await supabase.from("user_teams").upsert(
-        selected.map((teamId) => ({
-          user_id: "local-demo-user",
-          team_id: teamId,
-        })),
-        { onConflict: "user_id,team_id" },
+    if (error) {
+      console.error("Supabase user_teams write failed:", error);
+      return NextResponse.json(
+        { error: "Could not save your selected teams." },
+        { status: 500 },
       );
-
-      if (error) {
-        console.warn("Supabase user_teams write failed, continuing with local mock success:", error.message);
-      }
     }
 
     return NextResponse.json({

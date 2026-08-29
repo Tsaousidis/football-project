@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
+import { createBrowserSupabaseClient } from "@/lib/auth";
 import type { Team } from "@/lib/teams";
 
 const STORAGE_KEY = "football-dashboard-selected-teams";
@@ -12,27 +13,39 @@ export default function OnboardingPage() {
   const [teams, setTeams] = useState<Team[]>([]);
   const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [authReady, setAuthReady] = useState(false);
 
   useEffect(() => {
-    async function loadTeams() {
+    const supabase = createBrowserSupabaseClient();
+
+    async function loadData() {
+      const { data: authData } = await supabase.auth.getSession();
+
+      if (!authData.session) {
+        router.replace("/auth/login");
+        return;
+      }
+
+      setAuthReady(true);
+
       const response = await fetch("/api/teams");
       const payload = await response.json();
       setTeams(payload.teams ?? []);
     }
 
-    loadTeams();
-  }, []);
+    loadData();
+  }, [router]);
 
   const toggleTeam = (teamId: string) => {
-    setError(null);
+    setStatus(null);
     setSelectedTeamIds((current) => {
       if (current.includes(teamId)) {
         return current.filter((id) => id !== teamId);
       }
 
       if (current.length >= 3) {
-        setError("You can select up to 3 teams only.");
+        setStatus("You can select up to 3 teams only.");
         return current;
       }
 
@@ -42,12 +55,12 @@ export default function OnboardingPage() {
 
   const saveSelection = async () => {
     if (selectedTeamIds.length === 0) {
-      setError("Choose at least one team to continue.");
+      setStatus("Choose at least one team to continue.");
       return;
     }
 
     setIsSaving(true);
-    setError(null);
+    setStatus(null);
 
     try {
       const response = await fetch("/api/onboarding", {
@@ -67,13 +80,23 @@ export default function OnboardingPage() {
       window.localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedTeamIds));
       router.push("/dashboard");
     } catch (submitError) {
-      setError(
+      setStatus(
         submitError instanceof Error ? submitError.message : "Could not save selection.",
       );
     } finally {
       setIsSaving(false);
     }
   };
+
+  if (!authReady) {
+    return (
+      <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center px-6 py-12">
+        <div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 text-slate-200">
+          Checking your Supabase session...
+        </div>
+      </main>
+    );
+  }
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 md:px-10">
@@ -129,9 +152,9 @@ export default function OnboardingPage() {
         })}
       </section>
 
-      {error ? (
+      {status ? (
         <div className="mt-6 rounded-2xl border border-red-500/40 bg-red-500/10 px-4 py-3 text-sm text-red-200">
-          {error}
+          {status}
         </div>
       ) : null}
 
