@@ -1,0 +1,14 @@
+name: Daily football update
+
+on:
+  schedule:
+    - cron: '0 7 * * *'
+  workflow_dispatch:
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger application refresh endpoint
+        run: |
+          echo "Daily update job ready. Configure deployment URL and webhook in the project secrets."
