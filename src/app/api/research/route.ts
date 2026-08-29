@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 
-import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { researchTeamSnapshot } from "@/lib/football-research";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
 
-export async function POST(request: Request) {
+export async function POST() {
   try {
     const supabase = await createSupabaseServerClient();
     const {
@@ -39,6 +39,20 @@ export async function POST(request: Request) {
     ].slice(0, teamIds.length);
 
     const payload = await researchTeamSnapshot(teamNames);
+
+    const { error: saveError } = await supabase.from("dashboard_snapshots").insert({
+      user_id: user.id,
+      generated_at: payload.generatedAt,
+      data: payload,
+    });
+
+    if (saveError) {
+      console.error("Could not save dashboard snapshot:", saveError);
+      return NextResponse.json(
+        { error: "Research succeeded but snapshot persistence failed." },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({
       success: true,

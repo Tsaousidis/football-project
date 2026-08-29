@@ -63,6 +63,15 @@ create table if not exists public.stories (
   constraint stories_team_fk foreign key (team_id) references public.teams(id) on delete cascade
 );
 
+-- Real dashboard snapshot storage for the latest research payload
+create table if not exists public.dashboard_snapshots (
+  id uuid primary key default gen_random_uuid(),
+  user_id text not null,
+  generated_at timestamptz not null default now(),
+  data jsonb not null,
+  created_at timestamptz not null default now()
+);
+
 -- Source references for each story
 create table if not exists public.story_sources (
   id uuid primary key default gen_random_uuid(),
@@ -77,3 +86,4 @@ create index if not exists idx_user_teams_user_id on public.user_teams(user_id);
 create index if not exists idx_matches_team_id on public.matches(team_id);
 create index if not exists idx_standings_team_id on public.standings(team_id);
 create index if not exists idx_stories_team_id on public.stories(team_id);
+create index if not exists idx_dashboard_snapshots_user_id on public.dashboard_snapshots(user_id, created_at desc);
