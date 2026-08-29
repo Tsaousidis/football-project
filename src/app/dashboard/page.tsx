@@ -1,31 +1,25 @@
-"use client";
+import { redirect } from "next/navigation";
 
-import { useEffect, useState } from "react";
+import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { TEAM_CATALOG, type Team } from "@/lib/teams";
 
-import type { Team } from "@/lib/teams";
-import { TEAM_CATALOG } from "@/lib/teams";
+export default async function DashboardPage() {
+  const supabase = await createSupabaseServerClient();
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser();
 
-const STORAGE_KEY = "football-dashboard-selected-teams";
+  if (userError || !user) {
+    redirect("/auth/login");
+  }
 
-export default function DashboardPage() {
-  const [selectedTeamIds, setSelectedTeamIds] = useState<string[]>([]);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { data: selections, error } = await supabase
+    .from("user_teams")
+    .select("team_id")
+    .eq("user_id", user.id);
 
-  useEffect(() => {
-    const raw = window.localStorage.getItem(STORAGE_KEY);
-
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw) as string[];
-        setSelectedTeamIds(parsed);
-      } catch {
-        setSelectedTeamIds([]);
-      }
-    }
-
-    setIsLoaded(true);
-  }, []);
-
+  const selectedTeamIds = (selections ?? []).map((row) => row.team_id);
   const selectedTeams = TEAM_CATALOG.filter((team) =>
     selectedTeamIds.includes(team.id),
   );
@@ -47,9 +41,9 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      {!isLoaded ? (
-        <div className="mt-8 rounded-2xl border border-white/10 bg-slate-900/70 p-6 text-slate-200">
-          Loading your team selections...
+      {error ? (
+        <div className="mt-8 rounded-2xl border border-red-500/40 bg-red-500/10 p-6 text-red-200">
+          Could not load your team selections from Supabase.
         </div>
       ) : selectedTeams.length === 0 ? (
         <div className="mt-8 rounded-2xl border border-dashed border-white/20 bg-slate-900/60 p-8 text-center text-slate-200">
