@@ -1,4 +1,4 @@
-import { GoogleGenAI } from "@google/genai";
+import Anthropic from "@anthropic-ai/sdk";
 
 export type MatchSummary = {
   opponent: string;
@@ -153,28 +153,72 @@ export async function researchTeamSnapshot(teamNames: string[]): Promise<Footbal
     throw new Error("At least one team is required for research.");
   }
 
-  if (!process.env.GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is missing.");
+  const apiKey = process.env.ANTHROPIC_API_KEY;
+  const model = process.env.ANTHROPIC_MODEL ?? "claude-3-7-sonnet-latest";
+
+  if (!apiKey) {
+    throw new Error("ANTHROPIC_API_KEY is missing.");
   }
 
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+  const anthropic = new Anthropic({ apiKey });
 
-  const response = await ai.models.generateContent({
-    model: "gemini-2.5-flash",
-    contents: buildPrompt(teamNames),
-    config: {
-      responseMimeType: "application/json",
-      responseSchema: researchSchema,
-    },
+  const response = await anthropic.messages.create({
+    model,
+    max_tokens: 4000,
+    tools: [
+      {
+        type: "web_search_20250305",
+        name: "web_search",
+        max_uses: 5,
+        allowed_domains: [
+          "paokfc.gr",
+          "bvb.de",
+          "bundesliga.com",
+          "uefa.com",
+          "slgr.gr",
+          "espn.com",
+          "kicker.de",
+          "sky.com",
+          "goal.com",
+        ],
+      },
+    ],
+    messages: [
+      {
+        role: "user",
+        content: buildPrompt(teamNames),
+      },
+    ],
   });
 
-  const rawText = response.text;
+  const content = response.content
+    .map((part) => {
+      if (part.type === "text") {
+        return part.text;
+      }
 
-  if (!rawText) {
-    throw new Error("Gemini returned empty output.");
+      return "";
+    })
+    .join("")
+    .trim();
+
+  if (!content) {
+    throw new Error("Claude returned empty output.");
   }
 
-  const data = JSON.parse(rawText) as FootballResearchPayload;
+  let data: FootballResearchPayload;
+
+  try {
+    data = JSON.parse(content) as FootballResearchPayload;
+  } catch (error) {
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+
+    if (!jsonMatch) {
+      throw new Error("Claude response was not valid JSON.");
+    }
+
+    data = JSON.parse(jsonMatch[0]) as FootballResearchPayload;
+  }
 
   return data;
 }
