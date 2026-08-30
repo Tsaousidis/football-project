@@ -72,6 +72,18 @@ create table if not exists public.dashboard_snapshots (
   created_at timestamptz not null default now()
 );
 
+-- Per-user schedule controlled from the profile page
+create table if not exists public.schedule_settings (
+  user_id text primary key,
+  enabled boolean not null default false,
+  frequency text not null default 'daily' check (frequency in ('daily', 'weekly')),
+  day_of_week integer not null default 1 check (day_of_week between 0 and 6),
+  run_time time not null default '06:00',
+  timezone text not null default 'UTC',
+  last_run_at timestamptz,
+  updated_at timestamptz not null default now()
+);
+
 -- Source references for each story
 create table if not exists public.story_sources (
   id uuid primary key default gen_random_uuid(),
@@ -87,3 +99,12 @@ create index if not exists idx_matches_team_id on public.matches(team_id);
 create index if not exists idx_standings_team_id on public.standings(team_id);
 create index if not exists idx_stories_team_id on public.stories(team_id);
 create index if not exists idx_dashboard_snapshots_user_id on public.dashboard_snapshots(user_id, created_at desc);
+create index if not exists idx_schedule_settings_enabled on public.schedule_settings(enabled);
+
+alter table public.schedule_settings enable row level security;
+create policy "Users can read their own schedule" on public.schedule_settings
+  for select using (auth.uid()::text = user_id);
+create policy "Users can insert their own schedule" on public.schedule_settings
+  for insert with check (auth.uid()::text = user_id);
+create policy "Users can update their own schedule" on public.schedule_settings
+  for update using (auth.uid()::text = user_id);

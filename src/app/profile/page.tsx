@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { AppNav } from "@/app/components/AppNav";
+import { ScheduleSettings } from "./ScheduleSettings";
 
 export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
@@ -12,6 +13,20 @@ export default async function ProfilePage() {
   if (!user) {
     redirect("/auth/login");
   }
+
+  const { data: scheduleData } = await supabase
+    .from("schedule_settings")
+    .select("enabled, frequency, day_of_week, run_time, timezone")
+    .eq("user_id", user.id)
+    .maybeSingle();
+
+  const scheduleSettings = {
+    enabled: scheduleData?.enabled ?? false,
+    frequency: scheduleData?.frequency === "weekly" ? "weekly" as const : "daily" as const,
+    dayOfWeek: scheduleData?.day_of_week ?? 1,
+    runTime: scheduleData?.run_time?.slice(0, 5) ?? "06:00",
+    timezone: scheduleData?.timezone ?? "UTC",
+  };
 
   async function signOut() {
     "use server";
@@ -47,6 +62,8 @@ export default async function ProfilePage() {
           <p className="mt-5 text-xs uppercase tracking-[0.2em] text-slate-400">User ID</p>
           <p className="mt-2 break-all font-mono text-xs text-slate-400">{user.id}</p>
         </div>
+
+        <ScheduleSettings initialSettings={scheduleSettings} />
 
         <div className="mt-6 flex flex-wrap gap-3">
           <a
