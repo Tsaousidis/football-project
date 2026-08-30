@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 
+import { TEAM_CATALOG } from "@/lib/teams";
 import { researchTeamSnapshot } from "@/lib/football-research";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 
@@ -32,11 +33,16 @@ export async function POST() {
       );
     }
 
-    const teamNames = [
-      "PAOK",
-      "Borussia Dortmund",
-      "Liverpool",
-    ].slice(0, teamIds.length);
+    const teamNames = teamIds
+      .map((teamId) => TEAM_CATALOG.find((team) => team.id === teamId)?.name)
+      .filter((name): name is string => Boolean(name));
+
+    if (!teamNames.length) {
+      return NextResponse.json(
+        { error: "Selected team IDs could not be matched to the app catalog." },
+        { status: 400 },
+      );
+    }
 
     const payload = await researchTeamSnapshot(teamNames);
 
