@@ -114,7 +114,10 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
           <div className="mb-4 flex items-center justify-between gap-3">
             <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/80">Latest snapshot</p>
             <span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-200">
-              Last updated: {snapshot.generatedAt ? new Date(snapshot.generatedAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}
+              Last updated: {snapshot.generatedAt ? new Date(snapshot.generatedAt).toLocaleString([], {
+                dateStyle: "medium",
+                timeStyle: "short",
+              }) : "—"}
             </span>
           </div>
 
@@ -123,8 +126,8 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
               <div key={team.teamName} className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
                 <h2 className="text-xl font-bold text-white">{team.teamName}</h2>
                 <div className="mt-3 space-y-3">
-                  {(team.latestStories ?? []).slice(0, 2).map((story) => (
-                    <article key={story.title} className="rounded-xl bg-slate-800/80 px-3 py-3">
+                  {(team.latestStories ?? []).slice(0, 2).map((story, storyIndex) => (
+                    <article key={story.title ?? `story-${storyIndex}`} className="rounded-xl bg-slate-800/80 px-3 py-3">
                       <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-300/80">
                         {story.category ? <span>{story.category}</span> : null}
                         {story.importance ? <span className="text-slate-400">{story.importance}</span> : null}
@@ -149,6 +152,11 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
                       ) : null}
                     </article>
                   ))}
+                  {(team.latestStories ?? []).length === 0 ? (
+                    <p className="rounded-xl bg-slate-800/50 px-3 py-3 text-xs text-slate-400">
+                      No verified recent stories found.
+                    </p>
+                  ) : null}
                 </div>
               </div>
             ))}
