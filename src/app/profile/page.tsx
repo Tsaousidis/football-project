@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 
 import { createSupabaseServerClient } from "@/lib/supabase-server";
+import { AppNav } from "@/app/components/AppNav";
 
 export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
@@ -21,7 +22,9 @@ export default async function ProfilePage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col justify-center px-6 py-12">
+    <>
+      <AppNav />
+      <main className="mx-auto flex min-h-screen w-full max-w-4xl flex-col justify-center px-6 py-12">
       <div className="w-full rounded-3xl border border-emerald-500/20 bg-slate-950/80 p-8 shadow-2xl shadow-emerald-950/20">
         <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
           <div>
@@ -60,6 +63,7 @@ export default async function ProfilePage() {
           </a>
         </div>
       </div>
-    </main>
+      </main>
+    </>
   );
 }

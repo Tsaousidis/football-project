@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 
+import { AppNav } from "@/app/components/AppNav";
+
 export default function ResearchPage() {
   const [loading, setLoading] = useState(false);
   const [output, setOutput] = useState<string | null>(null);
@@ -34,7 +36,9 @@ export default function ResearchPage() {
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-10 md:px-10">
+    <>
+      <AppNav />
+      <main className="mx-auto flex min-h-screen w-full max-w-5xl flex-col px-6 py-10 md:px-10">
       <section className="rounded-3xl border border-emerald-500/20 bg-slate-950/80 p-8 shadow-2xl shadow-emerald-950/20">
         <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/80">AI Research</p>
         <h1 className="mt-3 text-4xl font-black text-white">Football snapshot research</h1>
@@ -64,6 +68,7 @@ export default function ResearchPage() {
           {output}
         </pre>
       ) : null}
-    </main>
+      </main>
+    </>
   );
 }

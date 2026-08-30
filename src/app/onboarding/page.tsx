@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 
 import { createBrowserSupabaseClient } from "@/lib/auth";
 import type { Team } from "@/lib/teams";
+import { AppNav } from "@/app/components/AppNav";
 
 const STORAGE_KEY = "football-dashboard-selected-teams";
 
@@ -110,7 +111,9 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 md:px-10">
+    <>
+      <AppNav />
+      <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 md:px-10">
       <section className="rounded-3xl border border-emerald-500/20 bg-slate-950/80 p-8 shadow-2xl shadow-emerald-950/20">
         <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/80">Onboarding</p>
         <h1 className="mt-3 text-4xl font-black text-white md:text-5xl">Choose your clubs</h1>
@@ -220,6 +223,7 @@ export default function OnboardingPage() {
           {isSaving ? "Saving..." : "Continue"}
         </button>
       </div>
-    </main>
+      </main>
+    </>
   );
 }

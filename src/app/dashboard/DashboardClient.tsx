@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 import type { Team } from "@/lib/teams";
+import { AppNav } from "@/app/components/AppNav";
 
 type SnapshotMatch = {
   opponent?: string;
@@ -81,7 +82,9 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
   };
 
   return (
-    <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 md:px-10">
+    <>
+      <AppNav />
+      <main className="mx-auto flex min-h-screen w-full max-w-6xl flex-col px-6 py-10 md:px-10">
       <section className="rounded-3xl border border-emerald-500/20 bg-slate-950/80 p-8 shadow-2xl shadow-emerald-950/20">
         <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -244,6 +247,7 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
           })}
         </section>
       )}
-    </main>
+      </main>
+    </>
   );
 }
