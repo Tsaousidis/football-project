@@ -13,7 +13,7 @@ type SnapshotMatch = {
   date?: string;
   time?: string;
   status?: string;
-  result?: string | null;
+  result?: string | number | Record<string, unknown> | null;
 };
 
 type SnapshotStanding = {
@@ -46,6 +46,20 @@ type DashboardClientProps = {
     teams?: SnapshotTeam[];
   } | null;
 };
+
+function formatMatchResult(result: SnapshotMatch["result"]) {
+  if (result === null || result === undefined) {
+    return "—";
+  }
+
+  if (typeof result !== "object") {
+    return String(result);
+  }
+
+  return Object.entries(result)
+    .map(([key, value]) => `${key}: ${typeof value === "object" ? JSON.stringify(value) : String(value)}`)
+    .join(" · ");
+}
 
 export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProps) {
   const router = useRouter();
@@ -220,7 +234,7 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
                     <div className="flex items-center justify-between gap-2">
                       <span>Last result</span>
                       <strong className="text-right text-slate-100">
-                        {lastResult?.result ? lastResult.result : "—"}
+                        {formatMatchResult(lastResult?.result)}
                       </strong>
                     </div>
                     {lastResult?.opponent ? (

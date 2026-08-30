@@ -7,7 +7,7 @@ export type MatchSummary = {
   date: string;
   time: string;
   status: "scheduled" | "finished" | "postponed";
-  result?: string;
+  result?: string | number | Record<string, unknown>;
 };
 
 export type StandingSummary = {
@@ -123,6 +123,8 @@ ${teamNames.map((team) => `- ${team}`).join("\n")}
 
 Requirements:
 - Search separately for each team and its current competition before producing the final JSON.
+- Return data for these selected teams only; do not add, substitute, or infer any other team.
+- Return exactly one team object for each selected team listed above.
 - Use reliable public sources and official club/league updates when available.
 - Prefer information published or updated closest to the current date.
 - Do not invent exact scores if not clearly verified.
@@ -226,8 +228,14 @@ export async function researchTeamSnapshot(teamNames: string[]): Promise<Footbal
     data = JSON.parse(jsonMatch[0]) as FootballResearchPayload;
   }
 
+  const requestedTeams = new Set(teamNames.map((teamName) => teamName.toLowerCase()));
+  const filteredTeams = data.teams.filter((team) =>
+    typeof team.teamName === "string" && requestedTeams.has(team.teamName.toLowerCase()),
+  );
+
   return {
     ...data,
     generatedAt: new Date().toISOString(),
+    teams: filteredTeams,
   };
 }
