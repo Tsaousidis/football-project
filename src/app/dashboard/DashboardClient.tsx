@@ -28,7 +28,14 @@ type SnapshotTeam = {
   nextMatch?: SnapshotMatch | null;
   lastResult?: SnapshotMatch | null;
   currentStanding?: SnapshotStanding | null;
-  latestStories?: Array<{ title?: string }>;
+  latestStories?: Array<{
+    title?: string;
+    summary?: string;
+    category?: string;
+    importance?: string;
+    sourceCount?: number;
+    sourceUrls?: string[];
+  }>;
 };
 
 type DashboardClientProps = {
@@ -112,13 +119,34 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
             {snapshot.teams.map((team) => (
               <div key={team.teamName} className="rounded-2xl border border-white/10 bg-slate-950/70 p-4">
                 <h2 className="text-xl font-bold text-white">{team.teamName}</h2>
-                <ul className="mt-3 space-y-2 text-sm text-slate-200">
+                <div className="mt-3 space-y-3">
                   {(team.latestStories ?? []).slice(0, 2).map((story) => (
-                    <li key={story.title} className="rounded-xl bg-slate-800/80 px-3 py-2">
-                      {story.title}
-                    </li>
+                    <article key={story.title} className="rounded-xl bg-slate-800/80 px-3 py-3">
+                      <div className="flex flex-wrap items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-300/80">
+                        {story.category ? <span>{story.category}</span> : null}
+                        {story.importance ? <span className="text-slate-400">{story.importance}</span> : null}
+                        {story.sourceCount ? <span className="text-slate-400">{story.sourceCount} sources</span> : null}
+                      </div>
+                      <h3 className="mt-1 text-sm font-semibold text-white">{story.title}</h3>
+                      {story.summary ? <p className="mt-1 text-xs leading-5 text-slate-300">{story.summary}</p> : null}
+                      {story.sourceUrls?.length ? (
+                        <div className="mt-2 flex flex-wrap gap-2">
+                          {story.sourceUrls.slice(0, 3).map((sourceUrl) => (
+                            <a
+                              key={sourceUrl}
+                              href={sourceUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-xs font-medium text-emerald-300 underline decoration-emerald-500/40 underline-offset-2 hover:text-emerald-200"
+                            >
+                              Open source
+                            </a>
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
                   ))}
-                </ul>
+                </div>
               </div>
             ))}
           </div>
