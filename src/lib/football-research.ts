@@ -111,14 +111,20 @@ const researchSchema = {
 };
 
 function buildPrompt(teamNames: string[]) {
+  const currentDate = new Date().toISOString().slice(0, 10);
+
   return `
 You are a football research assistant.
+
+Current date: ${currentDate}
 
 Goal: research the latest verified football information for the following teams:
 ${teamNames.map((team) => `- ${team}`).join("\n")}
 
 Requirements:
+- Search separately for each team and its current competition before producing the final JSON.
 - Use reliable public sources and official club/league updates when available.
+- Prefer information published or updated closest to the current date.
 - Do not invent exact scores if not clearly verified.
 - If uncertain, use "null" for fields that cannot be verified.
 - Return only valid JSON matching the requested schema.
@@ -220,5 +226,8 @@ export async function researchTeamSnapshot(teamNames: string[]): Promise<Footbal
     data = JSON.parse(jsonMatch[0]) as FootballResearchPayload;
   }
 
-  return data;
+  return {
+    ...data,
+    generatedAt: new Date().toISOString(),
+  };
 }

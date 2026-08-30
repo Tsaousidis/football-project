@@ -39,7 +39,7 @@ export default function ResearchPage() {
         <p className="text-sm uppercase tracking-[0.25em] text-emerald-300/80">AI Research</p>
         <h1 className="mt-3 text-4xl font-black text-white">Football snapshot research</h1>
         <p className="mt-3 text-slate-300">
-          This endpoint tests the Gemini-powered research layer that collects team matches, standings,
+          This endpoint tests the Claude-powered web research layer that collects team matches, standings,
           and story summaries without using a football API.
         </p>
 
