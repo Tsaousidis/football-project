@@ -167,6 +167,12 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
                       <div className="mt-2 text-xs text-slate-300">
                         vs {nextMatch.opponent}
                         {nextMatch.date ? ` · ${nextMatch.date}` : ""}
+                        {nextMatch.time ? ` · ${nextMatch.time}` : ""}
+                      </div>
+                    ) : null}
+                    {nextMatch?.competition || nextMatch?.venue ? (
+                      <div className="mt-1 text-xs text-slate-400">
+                        {[nextMatch.competition, nextMatch.venue].filter(Boolean).join(" · ")}
                       </div>
                     ) : null}
                   </div>
@@ -181,6 +187,12 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
                     {lastResult?.opponent ? (
                       <div className="mt-2 text-xs text-slate-300">
                         vs {lastResult.opponent}
+                        {lastResult.date ? ` · ${lastResult.date}` : ""}
+                      </div>
+                    ) : null}
+                    {lastResult?.competition || lastResult?.venue ? (
+                      <div className="mt-1 text-xs text-slate-400">
+                        {[lastResult.competition, lastResult.venue].filter(Boolean).join(" · ")}
                       </div>
                     ) : null}
                   </div>
@@ -194,7 +206,7 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
                     </div>
                     {standing ? (
                       <div className="mt-2 text-xs text-slate-300">
-                        {standing.points ?? "—"} pts · {standing.played ?? "—"} played
+                        {standing.points ?? "—"} pts · {standing.played ?? "—"} played · GD {standing.goalDifference ?? "—"}
                       </div>
                     ) : null}
                   </div>
