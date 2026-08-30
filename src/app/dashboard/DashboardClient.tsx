@@ -5,8 +5,29 @@ import { useState } from "react";
 
 import type { Team } from "@/lib/teams";
 
+type SnapshotMatch = {
+  opponent?: string;
+  competition?: string;
+  venue?: string;
+  date?: string;
+  time?: string;
+  status?: string;
+  result?: string | null;
+};
+
+type SnapshotStanding = {
+  position?: number;
+  points?: number;
+  played?: number;
+  goalDifference?: number;
+};
+
 type SnapshotTeam = {
   teamName?: string;
+  competition?: string;
+  nextMatch?: SnapshotMatch | null;
+  lastResult?: SnapshotMatch | null;
+  currentStanding?: SnapshotStanding | null;
   latestStories?: Array<{ title?: string }>;
 };
 
@@ -22,6 +43,10 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
   const router = useRouter();
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
+
+  const snapshotMap = new Map(
+    (snapshot?.teams ?? []).map((team) => [team.teamName?.toLowerCase() ?? "", team]),
+  );
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -106,40 +131,77 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
         </div>
       ) : (
         <section className="mt-8 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {selectedTeams.map((team: Team) => (
-            <article
-              key={team.id}
-              className="rounded-3xl border border-white/10 bg-slate-900/75 p-6 shadow-xl shadow-slate-950/30"
-            >
-              <div className="mb-5 flex items-center justify-between">
-                <div>
-                  <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{team.country}</p>
-                  <h2 className="mt-2 text-2xl font-bold text-white">{team.name}</h2>
-                </div>
-                <span
-                  className="flex h-12 w-12 items-center justify-center rounded-full text-sm font-black text-slate-950"
-                  style={{ backgroundColor: team.accent }}
-                >
-                  {team.shortName}
-                </span>
-              </div>
+          {selectedTeams.map((team: Team) => {
+            const teamSnapshot = snapshotMap.get(team.name.toLowerCase()) ?? snapshotMap.get(team.shortName.toLowerCase());
+            const nextMatch = teamSnapshot?.nextMatch;
+            const lastResult = teamSnapshot?.lastResult;
+            const standing = teamSnapshot?.currentStanding;
 
-              <div className="space-y-3 text-sm text-slate-200">
-                <div className="flex items-center justify-between rounded-xl bg-slate-800/80 px-3 py-2">
-                  <span>Next match</span>
-                  <strong className="text-emerald-300">TBD</strong>
+            return (
+              <article
+                key={team.id}
+                className="rounded-3xl border border-white/10 bg-slate-900/75 p-6 shadow-xl shadow-slate-950/30"
+              >
+                <div className="mb-5 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.25em] text-slate-400">{team.country}</p>
+                    <h2 className="mt-2 text-2xl font-bold text-white">{team.name}</h2>
+                  </div>
+                  <span
+                    className="flex h-12 w-12 items-center justify-center rounded-full text-sm font-black text-slate-950"
+                    style={{ backgroundColor: team.accent }}
+                  >
+                    {team.shortName}
+                  </span>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-slate-800/80 px-3 py-2">
-                  <span>Last result</span>
-                  <strong>—</strong>
+
+                <div className="space-y-3 text-sm text-slate-200">
+                  <div className="rounded-xl bg-slate-800/80 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Next match</span>
+                      <strong className="text-emerald-300 text-right">
+                        {nextMatch?.status ? nextMatch.status : "TBD"}
+                      </strong>
+                    </div>
+                    {nextMatch?.opponent ? (
+                      <div className="mt-2 text-xs text-slate-300">
+                        vs {nextMatch.opponent}
+                        {nextMatch.date ? ` · ${nextMatch.date}` : ""}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-xl bg-slate-800/80 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Last result</span>
+                      <strong className="text-right text-slate-100">
+                        {lastResult?.result ? lastResult.result : "—"}
+                      </strong>
+                    </div>
+                    {lastResult?.opponent ? (
+                      <div className="mt-2 text-xs text-slate-300">
+                        vs {lastResult.opponent}
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="rounded-xl bg-slate-800/80 px-3 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span>Standing</span>
+                      <strong className="text-right text-slate-100">
+                        {standing?.position ? `#${standing.position}` : "—"}
+                      </strong>
+                    </div>
+                    {standing ? (
+                      <div className="mt-2 text-xs text-slate-300">
+                        {standing.points ?? "—"} pts · {standing.played ?? "—"} played
+                      </div>
+                    ) : null}
+                  </div>
                 </div>
-                <div className="flex items-center justify-between rounded-xl bg-slate-800/80 px-3 py-2">
-                  <span>Standing</span>
-                  <strong>—</strong>
-                </div>
-              </div>
-            </article>
-          ))}
+              </article>
+            );
+          })}
         </section>
       )}
     </main>
