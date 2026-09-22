@@ -1,114 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
-
-export type MatchSummary = {
-  opponent: string;
-  competition: string;
-  venue: "Home" | "Away" | "Neutral";
-  date: string;
-  time: string;
-  status: "scheduled" | "finished" | "postponed";
-  result?: string | number | Record<string, unknown>;
-};
-
-export type StandingSummary = {
-  position: number;
-  points: number;
-  played: number;
-  goalDifference: number;
-};
-
-export type StorySummary = {
-  title: string;
-  summary: string;
-  category: string;
-  importance: "High" | "Medium" | "Normal";
-  sourceCount: number;
-  sourceUrls: string[];
-};
-
-export type TeamResearch = {
-  teamName: string;
-  competition: string;
-  nextMatch: MatchSummary | null;
-  lastResult: MatchSummary | null;
-  currentStanding: StandingSummary | null;
-  latestStories: StorySummary[];
-};
-
-export type FootballResearchPayload = {
-  generatedAt: string;
-  teams: TeamResearch[];
-};
-
-const researchSchema = {
-  type: "OBJECT",
-  properties: {
-    generatedAt: { type: "STRING" },
-    teams: {
-      type: "ARRAY",
-      items: {
-        type: "OBJECT",
-        properties: {
-          teamName: { type: "STRING" },
-          competition: { type: "STRING" },
-          nextMatch: {
-            type: "OBJECT",
-            properties: {
-              opponent: { type: "STRING" },
-              competition: { type: "STRING" },
-              venue: { type: "STRING" },
-              date: { type: "STRING" },
-              time: { type: "STRING" },
-              status: { type: "STRING" },
-              result: { type: "STRING" },
-            },
-            required: ["opponent", "competition", "venue", "date", "time", "status"],
-          },
-          lastResult: {
-            type: "OBJECT",
-            properties: {
-              opponent: { type: "STRING" },
-              competition: { type: "STRING" },
-              venue: { type: "STRING" },
-              date: { type: "STRING" },
-              time: { type: "STRING" },
-              status: { type: "STRING" },
-              result: { type: "STRING" },
-            },
-            required: ["opponent", "competition", "venue", "date", "time", "status"],
-          },
-          currentStanding: {
-            type: "OBJECT",
-            properties: {
-              position: { type: "INTEGER" },
-              points: { type: "INTEGER" },
-              played: { type: "INTEGER" },
-              goalDifference: { type: "INTEGER" },
-            },
-            required: ["position", "points", "played", "goalDifference"],
-          },
-          latestStories: {
-            type: "ARRAY",
-            items: {
-              type: "OBJECT",
-              properties: {
-                title: { type: "STRING" },
-                summary: { type: "STRING" },
-                category: { type: "STRING" },
-                importance: { type: "STRING" },
-                sourceCount: { type: "INTEGER" },
-                sourceUrls: { type: "ARRAY", items: { type: "STRING" } },
-              },
-              required: ["title", "summary", "category", "importance", "sourceCount", "sourceUrls"],
-            },
-          },
-        },
-        required: ["teamName", "competition", "nextMatch", "lastResult", "currentStanding", "latestStories"],
-      },
-    },
-  },
-  required: ["generatedAt", "teams"],
-};
+import { parseResearchResponse, type FootballResearchPayload } from "./research-payload";
+export type { FootballResearchPayload, TeamResearch, MatchSummary, StorySummary, StandingSummary } from "./research-payload";
 
 function buildPrompt(teamNames: string[]) {
   const currentDate = new Date().toISOString().slice(0, 10);
@@ -130,6 +22,9 @@ Requirements:
 - Do not invent exact scores if not clearly verified.
 - If uncertain, use "null" for fields that cannot be verified.
 - Return only valid JSON matching the requested schema.
+- Write all text in English. Copy the requested team names exactly.
+- Dates must be YYYY-MM-DD. Match result must be a string or null.
+- Return an entire match or standing as null if its required details cannot be verified.
 - Keep data fresh and concise.
 - For each team provide:
   1. teamName
@@ -162,13 +57,13 @@ export async function researchTeamSnapshot(teamNames: string[]): Promise<Footbal
   }
 
   const apiKey = process.env.ANTHROPIC_API_KEY;
-  const model = process.env.ANTHROPIC_MODEL ?? "claude-3-7-sonnet-latest";
+  const model = process.env.ANTHROPIC_MODEL ?? "claude-sonnet-4-6";
 
   if (!apiKey) {
     throw new Error("ANTHROPIC_API_KEY is missing.");
   }
 
-  const anthropic = new Anthropic({ apiKey });
+  const anthropic = new Anthropic({ apiKey, timeout: 120_000, maxRetries: 0 });
 
   const response = await anthropic.messages.create({
     model,
@@ -178,17 +73,6 @@ export async function researchTeamSnapshot(teamNames: string[]): Promise<Footbal
         type: "web_search_20250305",
         name: "web_search",
         max_uses: 5,
-        allowed_domains: [
-          "paokfc.gr",
-          "bvb.de",
-          "bundesliga.com",
-          "uefa.com",
-          "slgr.gr",
-          "espn.com",
-          "kicker.de",
-          "sky.com",
-          "goal.com",
-        ],
       },
     ],
     messages: [
@@ -198,6 +82,10 @@ export async function researchTeamSnapshot(teamNames: string[]): Promise<Footbal
       },
     ],
   });
+
+  if (response.stop_reason !== "end_turn") throw new Error("Research did not finish. Please try again.");
+  const searches = response.content.filter((part) => part.type === "web_search_tool_result");
+  if (!searches.length || searches.some((part) => !Array.isArray(part.content))) throw new Error("Web research was unavailable. Please try again.");
 
   const content = response.content
     .map((part) => {
@@ -214,28 +102,5 @@ export async function researchTeamSnapshot(teamNames: string[]): Promise<Footbal
     throw new Error("Claude returned empty output.");
   }
 
-  let data: FootballResearchPayload;
-
-  try {
-    data = JSON.parse(content) as FootballResearchPayload;
-  } catch (error) {
-    const jsonMatch = content.match(/\{[\s\S]*\}/);
-
-    if (!jsonMatch) {
-      throw new Error("Claude response was not valid JSON.");
-    }
-
-    data = JSON.parse(jsonMatch[0]) as FootballResearchPayload;
-  }
-
-  const requestedTeams = new Set(teamNames.map((teamName) => teamName.toLowerCase()));
-  const filteredTeams = data.teams.filter((team) =>
-    typeof team.teamName === "string" && requestedTeams.has(team.teamName.toLowerCase()),
-  );
-
-  return {
-    ...data,
-    generatedAt: new Date().toISOString(),
-    teams: filteredTeams,
-  };
+  return parseResearchResponse(content, teamNames);
 }

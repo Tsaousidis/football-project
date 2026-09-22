@@ -19,10 +19,12 @@ export async function POST() {
       );
     }
 
-    const { data: selections } = await supabase
+    const { data: selections, error: selectionError } = await supabase
       .from("user_teams")
       .select("team_id")
       .eq("user_id", user.id);
+
+    if (selectionError) return NextResponse.json({ error: "Could not load your teams. Please try again." }, { status: 500 });
 
     const teamIds = (selections ?? []).map((selection) => selection.team_id);
 
@@ -37,7 +39,7 @@ export async function POST() {
       .map((teamId) => TEAM_CATALOG.find((team) => team.id === teamId)?.name)
       .filter((name): name is string => Boolean(name));
 
-    if (!teamNames.length) {
+    if (teamNames.length !== teamIds.length || teamNames.length > 3) {
       return NextResponse.json(
         { error: "Selected team IDs could not be matched to the app catalog." },
         { status: 400 },
@@ -67,7 +69,7 @@ export async function POST() {
   } catch (error) {
     console.error("Research request failed:", error);
     return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Research failed." },
+      { error: "Research could not be completed. Please try again. Your previous update is still available." },
       { status: 500 },
     );
   }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useState, useRef } from "react";
 
 import { AppNav } from "@/app/components/AppNav";
 import type { Team } from "@/lib/teams";
@@ -43,6 +43,7 @@ type SnapshotTeam = {
 
 type DashboardClientProps = {
   selectedTeams: Team[];
+  snapshotWarning: string | null;
   snapshot: { generatedAt?: string; teams?: SnapshotTeam[] } | null;
 };
 
@@ -56,16 +57,20 @@ function formatMatchResult(result: SnapshotMatch["result"]) {
 
 function formatSnapshotDate(value?: string) {
   if (!value) return "No snapshot yet";
+  if (!Number.isFinite(Date.parse(value))) return "Date unavailable";
   return new Date(value).toLocaleString([], { dateStyle: "medium", timeStyle: "short" });
 }
 
-export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProps) {
+export function DashboardClient({ selectedTeams, snapshot, snapshotWarning }: DashboardClientProps) {
   const router = useRouter();
+  const refreshLock = useRef(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshError, setRefreshError] = useState<string | null>(null);
   const snapshotMap = new Map((snapshot?.teams ?? []).map((team) => [team.teamName?.toLowerCase() ?? "", team]));
 
   const handleRefresh = async () => {
+    if (refreshLock.current || !selectedTeams.length) return;
+    refreshLock.current = true;
     setIsRefreshing(true);
     setRefreshError(null);
     try {
@@ -76,6 +81,7 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
     } catch (error) {
       setRefreshError(error instanceof Error ? error.message : "Could not refresh the research snapshot.");
     } finally {
+      refreshLock.current = false;
       setIsRefreshing(false);
     }
   };
@@ -87,15 +93,19 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
         <div className="flex items-center justify-between gap-4 border-b border-white/10 pb-5">
           <div>
             <p className="text-xs uppercase tracking-[0.25em] text-emerald-300/80">Football intelligence</p>
-            <p className="mt-2 text-sm text-slate-400">Your selected teams, fixtures, standings, and verified news.</p>
+            <p className="mt-2 text-sm text-slate-400">Your selected teams, fixtures, standings, and AI-researched news.</p>
           </div>
-          <button type="button" onClick={handleRefresh} disabled={isRefreshing} className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
+          <button type="button" onClick={handleRefresh} disabled={isRefreshing || !selectedTeams.length} className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-500/10 px-4 py-2 text-sm font-semibold text-emerald-200 transition hover:bg-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-60">
             {isRefreshing ? "Refreshing..." : "Refresh research"}
           </button>
         </div>
 
         {refreshError ? <div className="mt-5 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">{refreshError}</div> : null}
 
+        {snapshotWarning && <p role="alert" className="mt-5 text-amber-200">{snapshotWarning}</p>}
+        {!snapshot && !snapshotWarning && selectedTeams.length > 0 && <p className="mt-5 text-slate-300">No research yet. Select Refresh research to create your first briefing.</p>}
+        {snapshot && selectedTeams.some((team) => !snapshotMap.has(team.name.toLowerCase())) && <p className="mt-5 text-amber-200">Your team selection has changed. Refresh research to include all selected teams.</p>}
+        {isRefreshing && <p role="status" className="mt-4 text-slate-300">Researching your teams. Your previous update remains visible.</p>}
         {selectedTeams.length === 0 ? (
           <div className="mt-8 rounded-2xl border border-dashed border-white/20 bg-slate-900/60 p-8 text-center text-slate-200">No teams selected yet. Head to the Teams page to choose your clubs.</div>
         ) : (
@@ -107,7 +117,7 @@ export function DashboardClient({ selectedTeams, snapshot }: DashboardClientProp
               </div>
               <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
                 {selectedTeams.map((team) => {
-                  const teamSnapshot = snapshotMap.get(team.name.toLowerCase()) ?? snapshotMap.get(team.shortName.toLowerCase());
+                  const teamSnapshot = snapshotMap.get(team.name.toLowerCase());
                   const nextMatch = teamSnapshot?.nextMatch;
                   const lastResult = teamSnapshot?.lastResult;
                   const standing = teamSnapshot?.currentStanding;

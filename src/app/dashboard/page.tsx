@@ -1,3 +1,4 @@
+import { validateResearchPayload, type FootballResearchPayload } from "@/lib/research-payload";
 import { redirect } from "next/navigation";
 
 import { DashboardClient } from "./DashboardClient";
@@ -15,7 +16,7 @@ export default async function DashboardPage() {
     redirect("/auth/login");
   }
 
-  const [{ data: selections, error }, { data: snapshotData }] = await Promise.all([
+  const [{ data: selections, error }, { data: snapshotData, error: snapshotError }] = await Promise.all([
     supabase.from("user_teams").select("team_id").eq("user_id", user.id),
     supabase
       .from("dashboard_snapshots")
@@ -31,10 +32,16 @@ export default async function DashboardPage() {
     selectedTeamIds.includes(team.id),
   );
 
-  const snapshot = snapshotData?.data as {
-    generatedAt?: string;
-    teams?: Array<{ teamName?: string; latestStories?: Array<{ title?: string }> }>;
-  } | null;
+  let snapshot: FootballResearchPayload | null = null;
+  let snapshotWarning = snapshotError ? "Could not load your saved research. Please reload the page." : null;
+  if (snapshotData && !snapshotError) {
+    try {
+      snapshot = validateResearchPayload(snapshotData.data, snapshotData.data.teams.map((team: { teamName: string }) => team.teamName));
+      snapshot.generatedAt = snapshotData.generated_at;
+    } catch {
+      snapshotWarning = "Your saved research could not be displayed. Refresh research to create a new update.";
+    }
+  }
 
   if (error) {
     return (
@@ -46,5 +53,5 @@ export default async function DashboardPage() {
     );
   }
 
-  return <DashboardClient selectedTeams={selectedTeams} snapshot={snapshot} />;
+  return <DashboardClient selectedTeams={selectedTeams} snapshot={snapshot} snapshotWarning={snapshotWarning} />;
 }
