@@ -5,6 +5,7 @@ import { useState, useRef } from "react";
 
 import { AppNav } from "@/app/components/AppNav";
 import type { Team } from "@/lib/teams";
+import { SendTelegramBriefing } from "./SendTelegramBriefing";
 
 type SnapshotMatch = {
   opponent?: string;
@@ -102,6 +103,7 @@ export function DashboardClient({ selectedTeams, snapshot, snapshotWarning }: Da
 
         {refreshError ? <div className="mt-5 rounded-2xl border border-red-500/40 bg-red-500/10 p-4 text-sm text-red-200">{refreshError}</div> : null}
 
+        <SendTelegramBriefing disabled={isRefreshing || !snapshot || Boolean(snapshotWarning) || !selectedTeams.length} />
         {snapshotWarning && <p role="alert" className="mt-5 text-amber-200">{snapshotWarning}</p>}
         {!snapshot && !snapshotWarning && selectedTeams.length > 0 && <p className="mt-5 text-slate-300">No research yet. Select Refresh research to create your first briefing.</p>}
         {snapshot && selectedTeams.some((team) => !snapshotMap.has(team.name.toLowerCase())) && <p className="mt-5 text-amber-200">Your team selection has changed. Refresh research to include all selected teams.</p>}
