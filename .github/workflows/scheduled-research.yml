@@ -1,9 +1,13 @@
-name: Scheduled football research
+name: Manual football schedule check
 
 on:
-  schedule:
-    - cron: "*/15 * * * *"
   workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: scheduled-football-research
+  cancel-in-progress: false
 
 jobs:
   refresh-research:
@@ -21,7 +25,8 @@ jobs:
           fi
 
           curl --fail-with-body --silent --show-error \
-            --retry 2 \
+            --connect-timeout 20 \
+            --max-time 840 \
             --request GET \
             --header "Authorization: Bearer ${CRON_SECRET}" \
-            "${APP_URL}/api/cron/research"
+            "${APP_URL%/}/api/cron/research"

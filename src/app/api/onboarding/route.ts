@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 
-import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { TEAM_CATALOG, validateTeamSelection } from "@/lib/teams";
+import { validateTeamSelection } from "@/lib/teams";
 
 export async function POST(request: Request) {
   try {
@@ -33,28 +32,6 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "You need to sign in before saving your team shortlist." },
         { status: 401 },
-      );
-    }
-
-    const adminSupabase = createSupabaseAdminClient();
-    const selectedTeams = TEAM_CATALOG.filter((team) => selected.includes(team.id));
-    const { error: teamSyncError } = await adminSupabase.from("teams").upsert(
-      selectedTeams.map((team) => ({
-        id: team.id,
-        name: team.name,
-        short_name: team.shortName,
-        country: team.country,
-        competition: team.competition,
-        accent_color: team.accent,
-      })),
-      { onConflict: "id" },
-    );
-
-    if (teamSyncError) {
-      console.error("Supabase teams sync failed:", teamSyncError);
-      return NextResponse.json(
-        { error: "Could not prepare the selected teams." },
-        { status: 500 },
       );
     }
 

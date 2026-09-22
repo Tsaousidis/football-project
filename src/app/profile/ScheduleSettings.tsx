@@ -49,6 +49,7 @@ export function ScheduleSettings({ initialSettings }: { initialSettings: Schedul
 
   return (
     <section className="mt-8 rounded-2xl border border-emerald-500/20 bg-slate-900/70 p-5">
+      <fieldset disabled={isSaving}>
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <p className="text-xs uppercase tracking-[0.2em] text-emerald-300/80">Automatic research</p>
@@ -60,6 +61,12 @@ export function ScheduleSettings({ initialSettings }: { initialSettings: Schedul
         </label>
       </div>
 
+      <p className="mt-4 text-sm text-slate-400">
+        No automatic schedule checks are currently configured. Saving these settings
+        does not start a background task. An enabled schedule is used only when a
+        schedule check is explicitly triggered. Use Refresh research on the dashboard
+        to request an update immediately.
+      </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <label className="text-sm text-slate-300">
           Frequency
@@ -95,6 +102,7 @@ export function ScheduleSettings({ initialSettings }: { initialSettings: Schedul
         </button>
         {status ? <span className="text-sm text-slate-300">{status}</span> : null}
       </div>
+      </fieldset>
     </section>
   );
 }

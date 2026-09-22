@@ -14,7 +14,7 @@ export default async function ProfilePage() {
     redirect("/auth/login");
   }
 
-  const { data: scheduleData } = await supabase
+  const { data: scheduleData, error: scheduleError } = await supabase
     .from("schedule_settings")
     .select("enabled, frequency, day_of_week, run_time, timezone")
     .eq("user_id", user.id)
@@ -63,7 +63,11 @@ export default async function ProfilePage() {
           <p className="mt-2 break-all font-mono text-xs text-slate-400">{user.id}</p>
         </div>
 
-        <ScheduleSettings initialSettings={scheduleSettings} />
+        {scheduleError ? (
+          <p role="alert" className="mt-8 text-red-300">
+            Could not load your schedule. Reload this page before making changes.
+          </p>
+        ) : <ScheduleSettings initialSettings={scheduleSettings} />}
 
         <div className="mt-6 flex flex-wrap gap-3">
           <a

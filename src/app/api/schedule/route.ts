@@ -49,13 +49,29 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "You must be signed in." }, { status: 401 });
   }
 
-  const body = await request.json();
+  let body;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON body." }, { status: 400 });
+  }
+
+  if (!body || typeof body !== "object" || Array.isArray(body)
+    || typeof body.enabled !== "boolean"
+    || !["daily", "weekly"].includes(body.frequency)
+    || !Number.isInteger(body.dayOfWeek) || body.dayOfWeek < 0 || body.dayOfWeek > 6
+    || typeof body.runTime !== "string" || !/^([01]\d|2[0-3]):[0-5]\d$/.test(body.runTime)
+    || typeof body.timezone !== "string" || !body.timezone.trim()) {
+    return NextResponse.json({ error: "Please provide valid schedule settings." }, { status: 400 });
+  }
+
   const settings = {
-    enabled: Boolean(body.enabled),
-    frequency: body.frequency === "weekly" ? "weekly" : "daily",
-    day_of_week: Math.min(6, Math.max(0, Number(body.dayOfWeek) || 0)),
-    run_time: typeof body.runTime === "string" && /^([01]\d|2[0-3]):[0-5]\d$/.test(body.runTime) ? body.runTime : "06:00",
-    timezone: typeof body.timezone === "string" && body.timezone.trim() ? body.timezone.trim() : "UTC",
+    enabled: body.enabled,
+    frequency: body.frequency,
+    day_of_week: body.dayOfWeek,
+    run_time: body.runTime,
+    timezone: body.timezone.trim(),
+    updated_at: new Date().toISOString(),
   };
 
   try {

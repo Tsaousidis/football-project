@@ -33,6 +33,15 @@ body {
   box-sizing: border-box;
 }
 
+select {
+  color-scheme: dark;
+}
+
+select option {
+  background: #0f172a;
+  color: #f8fafc;
+}
+
 ::selection {
   background: rgba(34, 197, 94, 0.4);
 }
