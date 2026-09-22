@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { createSupabaseServerClient } from "@/lib/supabase-server";
 import { AppNav } from "@/app/components/AppNav";
 import { ScheduleSettings } from "./ScheduleSettings";
+import { TelegramSettings } from "./TelegramSettings";
 
 export default async function ProfilePage() {
   const supabase = await createSupabaseServerClient();
@@ -68,6 +69,8 @@ export default async function ProfilePage() {
             Could not load your schedule. Reload this page before making changes.
           </p>
         ) : <ScheduleSettings initialSettings={scheduleSettings} />}
+
+        <TelegramSettings />
 
         <div className="mt-6 flex flex-wrap gap-3">
           <a
