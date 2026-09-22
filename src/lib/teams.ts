@@ -126,10 +126,13 @@ export const TEAM_CATALOG: Team[] = [
   { id: "braga", name: "Braga", league: "Primeira Liga", competition: "Primeira Liga", country: "Portugal", shortName: "BRA", accent: "#f97316" },
 ];
 
-export function validateTeamSelection(teamIds: string[]) {
-  const unique = [...new Set(teamIds)];
+export function validateTeamSelection(teamIds: unknown): string[] {
+  if (!Array.isArray(teamIds) || !teamIds.every((id) => typeof id === "string")) {
+    throw new Error("Please provide a list of team IDs.");
+  }
+  const unique = [...new Set<string>(teamIds)];
+  if (unique.length < 1 || unique.length > 3) throw new Error("Select between 1 and 3 teams.");
   const validIds = new Set(TEAM_CATALOG.map((team) => team.id));
-  const normalized = unique.filter((id) => validIds.has(id)).slice(0, 3);
-
-  return normalized;
+  if (unique.some((id) => !validIds.has(id))) throw new Error("One or more selected teams are not available.");
+  return unique;
 }

@@ -1,66 +1,36 @@
 import { NextResponse } from "next/server";
-
 import { createSupabaseServerClient } from "@/lib/supabase-server";
-import { validateTeamSelection } from "@/lib/teams";
+import { TEAM_CATALOG, validateTeamSelection } from "@/lib/teams";
+
+export async function GET() {
+  try {
+    const supabase = await createSupabaseServerClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+    const { data, error } = await supabase.from("user_teams").select("team_id").eq("user_id", user.id);
+    if (error) throw error;
+    return NextResponse.json({ teams: TEAM_CATALOG, selectedTeams: (data ?? []).map((row) => row.team_id) });
+  } catch {
+    return NextResponse.json({ error: "Could not load your selected teams. Please try again." }, { status: 500 });
+  }
+}
 
 export async function POST(request: Request) {
   try {
-    const body = await request.json();
-    const selected = validateTeamSelection(body?.teamIds ?? []);
-
-    if (selected.length === 0) {
-      return NextResponse.json(
-        { error: "Select at least one team." },
-        { status: 400 },
-      );
-    }
-
-    if (selected.length > 3) {
-      return NextResponse.json(
-        { error: "You can select up to 3 teams." },
-        { status: 400 },
-      );
-    }
-
     const supabase = await createSupabaseServerClient();
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      return NextResponse.json(
-        { error: "You need to sign in before saving your team shortlist." },
-        { status: 401 },
-      );
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) return NextResponse.json({ error: "Please sign in before saving your teams." }, { status: 401 });
+    let selected: string[];
+    try {
+      const body = await request.json();
+      selected = validateTeamSelection(body?.teamIds);
+    } catch (error) {
+      return NextResponse.json({ error: error instanceof SyntaxError ? "Invalid JSON body." : error instanceof Error ? error.message : "Invalid team selection." }, { status: 400 });
     }
-
-    const { error } = await supabase.from("user_teams").upsert(
-      selected.map((teamId) => ({
-        user_id: user.id,
-        team_id: teamId,
-      })),
-      { onConflict: "user_id,team_id" },
-    );
-
-    if (error) {
-      console.error("Supabase user_teams write failed:", error);
-      return NextResponse.json(
-        { error: "Could not save your selected teams." },
-        { status: 500 },
-      );
-    }
-
-    return NextResponse.json({
-      success: true,
-      selectedTeams: selected,
-      message: "Your team shortlist has been saved.",
-    });
-  } catch (error) {
-    console.error("Onboarding failed:", error);
-    return NextResponse.json(
-      { error: "Could not save team selection." },
-      { status: 500 },
-    );
+    const { error } = await supabase.rpc("replace_user_teams", { selected_team_ids: selected });
+    if (error) throw error;
+    return NextResponse.json({ success: true, selectedTeams: selected });
+  } catch {
+    return NextResponse.json({ error: "Could not confirm your save. Please reload your teams and try again." }, { status: 500 });
   }
 }

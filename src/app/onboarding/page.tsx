@@ -4,10 +4,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 import { AppNav } from "@/app/components/AppNav";
-import { createBrowserSupabaseClient } from "@/lib/auth";
 import type { Team } from "@/lib/teams";
 
-const STORAGE_KEY = "football-dashboard-selected-teams";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -21,23 +19,34 @@ export default function OnboardingPage() {
   const [status, setStatus] = useState<string | null>(null);
   const [authReady, setAuthReady] = useState(false);
 
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   useEffect(() => {
-    const supabase = createBrowserSupabaseClient();
+    const controller = new AbortController();
     async function loadData() {
-      const { data } = await supabase.auth.getSession();
-      if (!data.session) {
-        router.replace("/auth/login");
-        return;
+      try {
+        const response = await fetch("/api/onboarding", { signal: controller.signal, cache: "no-store" });
+        if (response.status === 401) { router.replace("/auth/login"); return; }
+        const payload = await response.json();
+        if (!response.ok) throw new Error(payload.error ?? "Could not load your teams.");
+        if (controller.signal.aborted) return;
+        const availableTeams: Team[] = payload.teams;
+        const saved: string[] = payload.selectedTeams;
+        const available = new Set(availableTeams.map((team) => team.id));
+        setTeams(availableTeams);
+        setSelectedTeamIds(saved.filter((id) => available.has(id)));
+        setSelectedLeague(availableTeams.find((team) => saved.includes(team.id))?.league ?? availableTeams[0]?.league ?? "");
+        if (saved.length > 3 || saved.some((id) => !available.has(id))) {
+          setStatus("Your previous selection needs updating. Choose up to 3 available teams and save.");
+        }
+        setAuthReady(true);
+      } catch (error) {
+        if (!controller.signal.aborted) setLoadError(error instanceof Error ? error.message : "Could not load your teams.");
       }
-      const response = await fetch("/api/teams");
-      const payload = await response.json();
-      const availableTeams = payload.teams ?? [];
-      setTeams(availableTeams);
-      setSelectedLeague(availableTeams[0]?.league ?? "");
-      setAuthReady(true);
     }
-    loadData();
-  }, [router]);
+    void loadData();
+    return () => controller.abort();
+  }, [router, loadAttempt]);
 
   const leagueOptions = useMemo(() => Array.from(new Set(teams.map((team) => team.league))).sort(), [teams]);
   const visibleTeams = useMemo(() => {
@@ -47,6 +56,7 @@ export default function OnboardingPage() {
   const selectedTeams = selectedTeamIds.map((id) => teams.find((team) => team.id === id)).filter((team): team is Team => Boolean(team));
 
   const toggleTeam = (teamId: string) => {
+    if (isSaving || flyingTeam) return;
     setStatus(null);
     setSelectedTeamIds((current) => {
       if (current.includes(teamId)) return current.filter((id) => id !== teamId);
@@ -59,6 +69,7 @@ export default function OnboardingPage() {
   };
 
   const handleTeamClick = (event: React.MouseEvent<HTMLButtonElement>, team: Team) => {
+    if (isSaving || flyingTeam) return;
     if (selectedTeamIds.includes(team.id)) {
       toggleTeam(team.id);
       return;
@@ -93,13 +104,14 @@ export default function OnboardingPage() {
       return;
     }
 
-    setSelectedTeamIds((current) => current.includes(flyingTeam.team.id) ? current : [...current, flyingTeam.team.id]);
+    setSelectedTeamIds((current) => current.length >= 3 || current.includes(flyingTeam.team.id) ? current : [...current, flyingTeam.team.id]);
     setFlyingTeam(null);
   };
 
   const saveSelection = async () => {
-    if (!selectedTeamIds.length) {
-      setStatus("Choose at least one team to continue.");
+    if (isSaving || flyingTeam) return;
+    if (!selectedTeamIds.length || selectedTeamIds.length > 3) {
+      setStatus("Choose between 1 and 3 teams to continue.");
       return;
     }
     setIsSaving(true);
@@ -112,7 +124,7 @@ export default function OnboardingPage() {
       });
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.error ?? "Could not save selection.");
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(selectedTeamIds));
+      router.refresh();
       router.push("/dashboard");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save selection.");
@@ -121,8 +133,10 @@ export default function OnboardingPage() {
     }
   };
 
+  if (loadError) return <main className="mx-auto max-w-lg px-6 py-20 text-slate-200"><p role="alert">{loadError}</p><button onClick={() => { setLoadError(null); setLoadAttempt((value) => value + 1); }} className="mt-4 rounded-xl bg-emerald-500 px-5 py-3 font-bold text-slate-950">Try again</button></main>;
+
   if (!authReady) {
-    return <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center px-6 py-12"><div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 text-slate-200">Checking your Supabase session...</div></main>;
+    return <main className="mx-auto flex min-h-screen w-full max-w-4xl items-center justify-center px-6 py-12"><div className="rounded-2xl border border-white/10 bg-slate-900/70 p-6 text-slate-200">Loading your teams...</div></main>;
   }
 
   return (
@@ -145,7 +159,7 @@ export default function OnboardingPage() {
               <label className="mt-4 block"><span className="sr-only">Search teams in {selectedLeague}</span><input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={`Search ${selectedLeague} teams...`} className="w-full rounded-xl border border-white/10 bg-slate-900 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-emerald-400/70" /></label>
             </div>
             <div className="max-h-[31rem] overflow-y-auto p-4 lg:min-h-0 lg:flex-1"><div className="mb-3 flex items-center justify-between text-xs uppercase tracking-[0.16em] text-slate-500"><span>{selectedLeague}</span><span>{visibleTeams.length} matches</span></div><div className="space-y-2">
-              {visibleTeams.map((team) => { const isSelected = selectedTeamIds.includes(team.id); return <button key={team.id} type="button" aria-pressed={isSelected} onClick={(event) => handleTeamClick(event, team)} className={`group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${isSelected ? "border-emerald-400/60 bg-emerald-500/10" : "border-white/10 bg-slate-900/70 hover:border-emerald-400/50 hover:bg-slate-800"}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-slate-950" style={{ backgroundColor: team.accent }}>{team.shortName}</span><span className="min-w-0 flex-1"><span className="block truncate font-semibold text-white">{team.name}</span><span className="mt-1 block text-xs text-slate-400">{team.country}</span></span><span className={`text-xs font-bold ${isSelected ? "text-emerald-300" : "text-slate-500 group-hover:text-slate-300"}`}>{isSelected ? "Added" : "Add"}</span></button>; })}
+              {visibleTeams.map((team) => { const isSelected = selectedTeamIds.includes(team.id); return <button key={team.id} type="button" disabled={isSaving || Boolean(flyingTeam)} aria-pressed={isSelected} onClick={(event) => handleTeamClick(event, team)} className={`group flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${isSelected ? "border-emerald-400/60 bg-emerald-500/10" : "border-white/10 bg-slate-900/70 hover:border-emerald-400/50 hover:bg-slate-800"}`}><span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full text-[11px] font-black text-slate-950" style={{ backgroundColor: team.accent }}>{team.shortName}</span><span className="min-w-0 flex-1"><span className="block truncate font-semibold text-white">{team.name}</span><span className="mt-1 block text-xs text-slate-400">{team.country}</span></span><span className={`text-xs font-bold ${isSelected ? "text-emerald-300" : "text-slate-500 group-hover:text-slate-300"}`}>{isSelected ? "Added" : "Add"}</span></button>; })}
               {!visibleTeams.length ? <p className="rounded-2xl border border-dashed border-white/10 p-6 text-center text-sm text-slate-400">No teams match your search.</p> : null}
             </div></div>
           </section>
@@ -153,10 +167,10 @@ export default function OnboardingPage() {
           <section ref={shortlistRef} className="rounded-3xl border border-emerald-500/20 bg-slate-900/70 p-5 shadow-2xl shadow-emerald-950/20 lg:flex lg:h-[42rem] lg:flex-col lg:sticky lg:top-6">
             <div className="flex items-center justify-between gap-3"><div><p className="text-xs uppercase tracking-[0.2em] text-emerald-300/80">Your shortlist</p><h2 className="mt-2 text-2xl font-bold text-white">Selected teams</h2></div><span className="rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-sm font-bold text-emerald-200">{selectedTeams.length}/3</span></div>
             <div className="mt-5 min-h-[25rem] space-y-3 rounded-2xl border border-dashed border-white/10 bg-slate-950/50 p-4 lg:min-h-0 lg:flex-1">
-              {!selectedTeams.length ? <div className="flex min-h-[22rem] items-center justify-center text-center text-sm leading-6 text-slate-500">Your selected team badges will appear here.</div> : selectedTeams.map((team) => <button key={team.id} type="button" onClick={() => toggleTeam(team.id)} className="group flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-slate-900/90 p-4 text-left shadow-lg shadow-black/20"><span className="team-badge-float flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-sm font-black text-slate-950" style={{ backgroundColor: team.accent }}>{team.shortName}</span><span className="min-w-0 flex-1"><span className="block truncate text-lg font-bold text-white">{team.name}</span><span className="mt-1 block text-xs uppercase tracking-[0.15em] text-slate-400">{team.league}</span></span><span className="text-xs text-slate-500 transition group-hover:text-red-300">Remove</span></button>)}
+              {!selectedTeams.length ? <div className="flex min-h-[22rem] items-center justify-center text-center text-sm leading-6 text-slate-500">Your selected team badges will appear here.</div> : selectedTeams.map((team) => <button key={team.id} type="button" disabled={isSaving || Boolean(flyingTeam)} onClick={() => toggleTeam(team.id)} className="group flex w-full items-center gap-4 rounded-2xl border border-white/10 bg-slate-900/90 p-4 text-left shadow-lg shadow-black/20"><span className="team-badge-float flex h-16 w-16 shrink-0 items-center justify-center rounded-full text-sm font-black text-slate-950" style={{ backgroundColor: team.accent }}>{team.shortName}</span><span className="min-w-0 flex-1"><span className="block truncate text-lg font-bold text-white">{team.name}</span><span className="mt-1 block text-xs uppercase tracking-[0.15em] text-slate-400">{team.league}</span></span><span className="text-xs text-slate-500 transition group-hover:text-red-300">Remove</span></button>)}
             </div>
             {status ? <div className="mt-4 rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-200">{status}</div> : null}
-            <button type="button" onClick={saveSelection} disabled={isSaving || !selectedTeamIds.length} className="mt-5 w-full rounded-2xl bg-emerald-500 px-5 py-3.5 text-sm font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">{isSaving ? "Saving teams..." : "Save teams"}</button>
+            <button type="button" onClick={saveSelection} disabled={isSaving || Boolean(flyingTeam) || !selectedTeamIds.length || selectedTeamIds.length > 3} className="mt-5 w-full rounded-2xl bg-emerald-500 px-5 py-3.5 text-sm font-black text-slate-950 transition hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400">{isSaving ? "Saving teams..." : "Save teams"}</button>
           </section>
         </div>
         {flyingTeam ? <span onAnimationEnd={finishTeamFlight} className="team-badge-flight flex h-16 w-16 items-center justify-center rounded-full text-sm font-black text-slate-950" style={{ backgroundColor: flyingTeam.team.accent, left: flyingTeam.startX, top: flyingTeam.startY, "--flight-x": `${flyingTeam.targetX - flyingTeam.startX}px`, "--flight-y": `${flyingTeam.targetY - flyingTeam.startY}px` } as React.CSSProperties}>{flyingTeam.team.shortName}</span> : null}
