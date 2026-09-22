@@ -48,7 +48,53 @@ References: [Supabase Next.js tutorial](https://supabase.com/nextjs),
 Actual email delivery and project settings must be checked against the configured
 Supabase instance. Local mocked tests do not verify those external services.
 
-Resending confirmation emails and password recovery are the next separate step.
+## Password recovery and verification resend
+
+The login and authentication error pages now link to:
+
+- /auth/resend-verification: resends an existing signup confirmation.
+- /auth/forgot-password: requests a password recovery email.
+- /auth/reset-password: lets an authenticated user save a new password.
+
+Email request forms display neutral success messages and a 60-second UI cooldown.
+Supabase enforces actual server-side email rate limits; reloading the UI does not
+replace that protection. Password update requires a valid Supabase session and
+matching passwords of at least 8 characters. Success retains the session and
+links to Dashboard. Signed-in users can also use the form to change their password.
+
+In Supabase Authentication > Email Templates > Reset password, set:
+
+```html
+<h2>Reset your password</h2>
+<p><a href="{{ .SiteURL }}/auth/confirm?token_hash={{ .TokenHash }}&type=recovery">Choose a new password</a></p>
+<p>If you did not request this email, you can ignore it.</p>
+```
+
+Keep the Confirm signup template above for verification resend. Add the exact
+local and production /auth/callback?next=/auth/reset-password URLs to the allowed
+redirect list for the PKCE fallback. The token-hash template uses Site URL and
+works across browsers. Never put service-role credentials in the browser.
+
+Recovery acceptance checks:
+
+- Resend verification for an unconfirmed account and open the new email link.
+- Request password reset, open the link in another browser and save a new password.
+- Sign out; the new password should work and the previous password should fail.
+- Check mismatched/short passwords and a session expiring before submission.
+- Open /auth/reset-password without a session: a new-link prompt should appear.
+- Open an expired or reused recovery link: show the error page with recovery links.
+- Check unknown email, throttled requests and network failure messages.
+
+References: [password recovery](https://supabase.com/docs/reference/javascript/auth-resetpasswordforemail),
+[verification resend](https://supabase.com/docs/reference/javascript/auth-resend).
+
+Commit for this second step (after the first authentication commit):
+
+```powershell
+git add -- src/app/auth/EmailRequestForm.tsx src/app/auth/forgot-password src/app/auth/resend-verification src/app/auth/reset-password src/app/auth/login/page.tsx src/app/auth/confirm/route.ts src/app/auth/callback/route.ts src/app/auth/auth-code-error/page.tsx tests/auth-routes.test.mjs docs/auth-setup.md
+git commit -m "feat(auth): add verification resend and password reset"
+```
+
 
 ## Commit scope
 

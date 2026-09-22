@@ -30,10 +30,10 @@ test("confirmation exchanges email token and strips credentials from redirect", 
   assert.equal(result.headers.get("location"), "https://app.example/onboarding");
 });
 
-test("missing tokens and non-email OTP types do not reach Supabase", async () => {
+test("missing tokens and unsupported OTP types do not reach Supabase", async () => {
   let calls = 0;
   const get = loadRoute(confirmPath, { verifyOtp: async () => { calls++; return { error: null }; } });
-  for (const query of ["", "?type=email", "?token_hash=test&type=recovery"]) {
+  for (const query of ["", "?type=email", "?token_hash=test&type=invite", "?token_hash=test&type=recovery&error=denied"]) {
     const result = await get(new Request("https://app.example/auth/confirm" + query));
     assert.equal(result.headers.get("location"), "https://app.example/auth/auth-code-error");
   }
@@ -67,4 +67,27 @@ test("callback auth errors and missing codes never create a session", async () =
     assert.equal(result.headers.get("location"), "https://app.example/auth/auth-code-error");
   }
   assert.equal(calls, 0);
+});
+
+
+test("recovery verification redirects only to the password form", async () => {
+  let input;
+  const get = loadRoute(confirmPath, { verifyOtp: async (value) => { input = value; return { error: null }; } });
+  const result = await get(new Request("https://app.example/auth/confirm?token_hash=recovery-token&type=recovery&next=https://evil.example"));
+  assert.deepEqual(input, { token_hash: "recovery-token", type: "recovery" });
+  assert.equal(result.headers.get("location"), "https://app.example/auth/reset-password");
+});
+
+test("expired recovery links never open the password form", async () => {
+  const get = loadRoute(confirmPath, { verifyOtp: async () => ({ error: { message: "Expired" } }) });
+  const result = await get(new Request("https://app.example/auth/confirm?token_hash=expired&type=recovery"));
+  assert.equal(result.headers.get("location"), "https://app.example/auth/auth-code-error");
+});
+
+test("PKCE recovery requires successful code exchange", async () => {
+  for (const error of [null, { message: "Invalid code" }]) {
+    const get = loadRoute(callbackPath, { exchangeCodeForSession: async () => ({ error }) });
+    const result = await get(new Request("https://app.example/auth/callback?code=recovery&next=/auth/reset-password"));
+    assert.equal(result.headers.get("location"), "https://app.example" + (error ? "/auth/auth-code-error" : "/auth/reset-password"));
+  }
 });

@@ -95,6 +95,10 @@ export default function LoginPage() {
             </button>
           </fieldset>
         </form>
+        <div className="mt-5 flex flex-wrap gap-4 text-sm text-emerald-300">
+          <Link href="/auth/forgot-password" className="underline">Forgot password?</Link>
+          <Link href="/auth/resend-verification" className="underline">Resend verification email</Link>
+        </div>
         {message && <p role={isError ? "alert" : "status"} className={"mt-5 rounded-xl border p-4 text-sm " + (isError ? "border-red-400/30 text-red-200" : "border-emerald-400/30 text-emerald-200")}>{message}</p>}
       </section>
     </main>

@@ -13,6 +13,10 @@ export default function AuthCodeErrorPage() {
         <Link href="/auth/login" className="mt-6 inline-block rounded-xl bg-emerald-500 px-5 py-3 font-bold text-slate-950">
           Back to sign in
         </Link>
+        <div className="mt-5 flex flex-wrap justify-center gap-4 text-sm text-emerald-300">
+          <Link href="/auth/resend-verification" className="underline">Resend verification email</Link>
+          <Link href="/auth/forgot-password" className="underline">Request password reset</Link>
+        </div>
       </div>
     </main>
   );
