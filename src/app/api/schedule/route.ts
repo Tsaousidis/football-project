@@ -80,10 +80,10 @@ export async function PUT(request: Request) {
     return NextResponse.json({ error: "Please enter a valid IANA timezone." }, { status: 400 });
   }
 
-  const { data, error } = await supabase.from("schedule_settings").upsert({ user_id: user.id, ...settings }, { onConflict: "user_id" }).select("enabled, frequency, day_of_week, run_time, timezone").single();
+  const { data, error } = await supabase.rpc("save_football_schedule", { p_enabled: settings.enabled, p_frequency: settings.frequency, p_day: settings.day_of_week, p_time: settings.run_time, p_timezone: settings.timezone }).single<Parameters<typeof mapSettings>[0]>();
 
   if (error) {
-    return NextResponse.json({ error: "Could not save schedule settings." }, { status: 500 });
+    return NextResponse.json({ error: "Could not save the schedule. Check that the scheduler migration and server configuration are complete." }, { status: 500 });
   }
 
   return NextResponse.json({ settings: mapSettings(data) });

@@ -1,7 +1,4 @@
 import { NextResponse } from "next/server";
-
-import { isScheduleDue } from "@/lib/schedule";
-
 import { researchTeamSnapshot } from "@/lib/football-research";
 import { createSupabaseAdminClient } from "@/lib/supabase-admin";
 import { TEAM_CATALOG } from "@/lib/teams";
@@ -9,90 +6,28 @@ import { TEAM_CATALOG } from "@/lib/teams";
 export const runtime = "nodejs";
 
 export async function GET(request: Request) {
-  const authorization = request.headers.get("authorization");
-  const expectedSecret = process.env.CRON_SECRET;
-
-  if (!expectedSecret || authorization !== `Bearer ${expectedSecret}`) {
+  const secret = process.env.CRON_SECRET;
+  if (!secret || request.headers.get("authorization") !== "Bearer " + secret) {
     return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   }
-
+  const targetUser = new URL(request.url).searchParams.get("user_id");
+  if (!targetUser || !/^[0-9a-f-]{36}$/i.test(targetUser)) return NextResponse.json({ error: "A valid user_id is required." }, { status: 400 });
   try {
-    const supabase = createSupabaseAdminClient();
-    const { data: schedules, error: scheduleError } = await supabase
-      .from("schedule_settings")
-      .select("user_id, enabled, frequency, day_of_week, run_time, timezone, last_run_at")
-      .eq("enabled", true);
-
-    if (scheduleError) {
-      throw new Error(`Could not load schedule settings: ${scheduleError.message}`);
-    }
-
-    const scheduledUsers = (schedules ?? []).filter((schedule) => isScheduleDue(schedule)).map((schedule) => schedule.user_id);
-
-    if (!scheduledUsers.length) {
-      return NextResponse.json({ success: true, updatedUsers: 0, message: "No schedules are due." });
-    }
-
-    const { data: selections, error: selectionError } = await supabase
-      .from("user_teams")
-      .select("user_id, team_id")
-      .in("user_id", scheduledUsers)
-      .order("user_id");
-
-    if (selectionError) {
-      throw new Error(`Could not load user team selections: ${selectionError.message}`);
-    }
-
-    const teamsByUser = new Map<string, string[]>();
-
-    for (const selection of selections ?? []) {
-      const team = TEAM_CATALOG.find((catalogTeam) => catalogTeam.id === selection.team_id);
-
-      if (!team) {
-        continue;
-      }
-
-      const userTeams = teamsByUser.get(selection.user_id) ?? [];
-      userTeams.push(team.name);
-      teamsByUser.set(selection.user_id, userTeams);
-    }
-
-    let updatedUsers = 0;
-
-    for (const [userId, teamNames] of teamsByUser) {
-      const payload = await researchTeamSnapshot(teamNames);
-      const { error: saveError } = await supabase.from("dashboard_snapshots").insert({
-        user_id: userId,
-        generated_at: payload.generatedAt,
-        data: payload,
-      });
-
-      if (saveError) {
-        throw new Error(`Could not save snapshot for user ${userId}: ${saveError.message}`);
-      }
-
-      const { error: scheduleUpdateError } = await supabase
-        .from("schedule_settings")
-        .update({ last_run_at: new Date().toISOString() })
-        .eq("user_id", userId);
-
-      if (scheduleUpdateError) {
-        throw new Error(`Could not update schedule for user ${userId}: ${scheduleUpdateError.message}`);
-      }
-
-      updatedUsers += 1;
-    }
-
-    return NextResponse.json({
-      success: true,
-      updatedUsers,
-      generatedAt: new Date().toISOString(),
+    const client = createSupabaseAdminClient();
+    const { data: claim, error: claimError } = await client.rpc("claim_football_schedule", { target_user: targetUser }).maybeSingle<{ last_attempt_at: string }>();
+    if (claimError) throw claimError;
+    if (!claim) return NextResponse.json({ success: true, updatedUsers: 0, message: "Schedule disabled, not due, or already running." });
+    const { data: selections, error: selectionError } = await client.from("user_teams").select("team_id").eq("user_id", targetUser);
+    if (selectionError) throw selectionError;
+    const names = (selections ?? []).map((row) => TEAM_CATALOG.find((team) => team.id === row.team_id)?.name);
+    if (!names.length || names.length > 3 || names.some((name) => !name)) throw new Error("Invalid team selection");
+    const payload = await researchTeamSnapshot(names as string[]);
+    const { data: saved, error: saveError } = await client.rpc("finish_football_schedule", {
+      target_user: targetUser, attempt_at: claim.last_attempt_at, snapshot_data: payload,
     });
-  } catch (error) {
-    console.error("Scheduled research failed:", error);
-    return NextResponse.json(
-      { error: error instanceof Error ? error.message : "Scheduled research failed." },
-      { status: 500 },
-    );
+    if (saveError || !saved) throw new Error("Could not save research");
+    return NextResponse.json({ success: true, updatedUsers: 1 });
+  } catch {
+    return NextResponse.json({ error: "Scheduled research failed. Check server configuration and selected teams." }, { status: 500 });
   }
 }

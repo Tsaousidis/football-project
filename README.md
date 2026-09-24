@@ -2,32 +2,15 @@ This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-
 
 ## Automatic football research
 
-There is no periodic GitHub Actions trigger. `scheduled-research.yml` can only
-be started explicitly with **Run workflow**. This checks saved, enabled Profile
-schedules; it does not force research before their selected time. With no due
-schedules the endpoint returns `updatedUsers: 0`.
+Profile now controls a per-account Supabase Cron job. Enabling and saving creates
+it; disabling and saving removes it. Disabled accounts have no scheduled checks.
+While enabled, the job checks every 15 minutes and dispatches research only when
+its local schedule is due. Telegram delivery remains manual.
 
-Profile saves schedule preferences but does not enable a background scheduler.
-Controlling the workflow itself from Profile still requires a server-side scheduler
-integration. Until that is connected, use **Refresh research** on the dashboard
-for an immediate update. Opening a page does not request fresh AI research.
-
-If an older workflow is already published, disable it in GitHub Actions immediately
-to stop its old cron trigger. Local changes only take effect after publication on
-the default branch. Disable the old `Daily football update` workflow too, if present.
-Already-running requests can still finish.
-
-Deployment setup:
-
-- Apply `supabase/schema.sql` when initializing the database, including
-  `schedule_settings` and its row-level access policies.
-- Set repository Actions variable `APP_URL` to the deployed application's base URL.
-- Set repository Actions secret `CRON_SECRET` to match the deployment's `CRON_SECRET`.
-- Configure the deployment's Supabase variables, including `SUPABASE_SERVICE_ROLE_KEY`,
-  and the research provider credentials from `.env.example`.
-- Publish the workflow on the repository's default branch and deploy the application changes.
-
-Run schedule regression checks with Node.js 24: `node --test tests/schedule.test.mjs`.
+Apply the required migration and Vault setup in [scheduler-setup.md](docs/scheduler-setup.md)
+before deploying this step. Existing saved schedules are disabled during migration
+so users explicitly opt in to the new automation. GitHub Actions has no periodic
+trigger; its optional manual check requires a user ID and respects disabled schedules.
 
 ## Getting Started
 

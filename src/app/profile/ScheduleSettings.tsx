@@ -39,7 +39,7 @@ export function ScheduleSettings({ initialSettings }: { initialSettings: Schedul
       }
 
       setSettings(payload.settings);
-      setStatus("Schedule settings saved.");
+      setStatus(payload.settings.enabled ? "Schedule enabled. Automatic research is now scheduled." : "Schedule disabled. No scheduled checks will run for your account.");
     } catch (error) {
       setStatus(error instanceof Error ? error.message : "Could not save schedule settings.");
     } finally {
@@ -62,10 +62,10 @@ export function ScheduleSettings({ initialSettings }: { initialSettings: Schedul
       </div>
 
       <p className="mt-4 text-sm text-slate-400">
-        No automatic schedule checks are currently configured. Saving these settings
-        does not start a background task. An enabled schedule is used only when a
-        schedule check is explicitly triggered. Use Refresh research on the dashboard
-        to request an update immediately.
+        Enable and save to start automatic research for your account. Disable and save
+        to remove your scheduled job entirely. While enabled, the scheduler checks every
+        15 minutes and runs research after your chosen local time. An update already
+        in progress may finish. Telegram briefings remain manual.
       </p>
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
         <label className="text-sm text-slate-300">
