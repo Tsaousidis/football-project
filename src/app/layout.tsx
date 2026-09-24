@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Football Intelligence Dashboard",
   description:
-    "Phase 1 foundation for a personal AI football dashboard with Next.js, Supabase, and automation-ready infrastructure.",
+    "Follow your favourite football teams with personal Claude-researched briefings, fixtures, results, news and Telegram delivery on your terms.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
